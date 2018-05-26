@@ -8,9 +8,9 @@ import java.sql.DriverManager;
  * 在DbUtil类内部预存储了两个用户信息来模拟数据库中的用户记录。
  */
 public class DBUtil {
-	private volatile static Connection conn;
+	private static Connection conn;
 	
-	public static Connection getConnInstance() {
+	public static Connection getConnSingleton() {
 		if (null == conn) {
 			synchronized (DBUtil.class) {
 				if (null == conn) {

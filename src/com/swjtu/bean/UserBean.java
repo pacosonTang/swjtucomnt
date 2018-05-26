@@ -1,4 +1,4 @@
-package com.swjtu.pojo;
+package com.swjtu.bean;
 
 import java.io.Serializable;
 
