@@ -4,7 +4,8 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
 import com.sun.istack.internal.logging.Logger;
-import com.swjtu.utils.RandomGenerator;
+import com.swjtu.error.UtilsException;
+import com.swjtu.utils.SWJTU;
 
 public class PostDao extends BaseDao {
 	private Logger logger = Logger.getLogger(PostDao.class);
@@ -14,25 +15,20 @@ public class PostDao extends BaseDao {
 		PreparedStatement ps = null;
 		try {
 			ps = conn.prepareStatement(sql);
-			ps.setString(1, new RandomGenerator.String(20).next());
+			ps.setString(1, SWJTU.Utils.SequenceUtil.getNextKey("post_tbl"));
 			ps.setString(2, title);
 			ps.setString(3, content);
 			ps.addBatch();
 			int[] bats = ps.executeBatch();
+			ps.close();
 			return bats[0];
-		} catch (SQLException e) {
+		} catch (UtilsException e) {
+			logger.severe("使用sequence生成主键异常！！");
 			e.printStackTrace();
-		} finally {
-			try {
-				if (null != ps) {
-					ps.close();
-				}
-				conn.close();
-			} catch (SQLException e) {
-				logger.severe("关闭数据库连接失败！！");
-				e.printStackTrace();
-			}
-		}
+		} catch (SQLException e) {
+			logger.severe("关闭数据库连接失败！！");
+			e.printStackTrace();
+		} 
 		return 0;
 	}
 }

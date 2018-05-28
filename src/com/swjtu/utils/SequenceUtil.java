@@ -11,19 +11,22 @@ import com.sun.istack.internal.logging.Logger;
 import com.swjtu.error.UtilsException;
 
 public class SequenceUtil {
-	private Connection conn = DBUtil.getConnSingleton();
-	private Logger logger = Logger.getLogger(SequenceUtil.class);
+	private static Connection conn = DBUtil.getConnSingleton();
+	private static Logger logger = Logger.getLogger(SequenceUtil.class);
 	
-	public synchronized String getNextKey(String tblName) throws UtilsException {
+	public static String getNextKey(String tblName) throws UtilsException {
 		StringBuilder key = new StringBuilder();
 		
-		String nickName = this.getTblNickName(tblName);
+		String nickName = getTblNickName(tblName);
 		if (null == nickName) {
 			throw new UtilsException("获取数据库表别名失败！！");
 		}
-		key.append(nickName).append("_").append(this.getCurDate());
-		String curSequenceValue = ""; 
-		key.append(curSequenceValue);
+		key.append(nickName).append("_").append(getCurDate());
+		int curV = getCurValue(nickName);
+		if (0 == curV) {
+			throw new UtilsException("获取sequence表的当前值失败！！");
+		}
+		key.append(curV);
 		
 		return key.toString() ;
 	}
@@ -31,7 +34,7 @@ public class SequenceUtil {
 	 * 获取当前日期 yyyyMMdd
 	 * @return
 	 */
-	private String getCurDate() {
+	private static String getCurDate() {
 		return new SimpleDateFormat("yyyyMMdd").format(new Date());
 	}
 	/**
@@ -39,76 +42,65 @@ public class SequenceUtil {
 	 * @param tblName
 	 * @return
 	 */
-	private String getTblNickName(String tblName) {
+	private static String getTblNickName(String tblName) {
 		try {
 			String sql = "select tbl_nickname from alias_tbl where tbl_fullname = ?";
 			PreparedStatement ps = conn.prepareStatement(sql);
 			ps.setString(1, tblName);
 			ps.addBatch();
 			ResultSet rs = ps.executeQuery();
-			if (rs.next()) {
-				return rs.getString(1);
-			} else {
+			if (false == rs.next()) {
 				return null;
 			}
+			String nickName = rs.getString(1);
+			rs.close();
+			ps.close();
+			return nickName;
 		} catch (SQLException e) {
+			logger.severe("关闭数据库连接失败！！");
 			e.printStackTrace();
-		} finally {
-			try {
-				conn.close();
-			} catch (SQLException e) {
-				logger.severe("关闭数据库连接失败！！");
-				e.printStackTrace();
-			}
-		}
+		} 
 		return null;
 	}
-	private String getCurValue(String nickName) {
+	private static int getCurValue(String nickName) throws UtilsException{
+		int result = 0;
 		try {
-			String sql = "select cur_value from sequence_tbl where tbl_name = ?";
-			PreparedStatement ps = conn.prepareStatement(sql);
+			String selSql = "select min_value, max_value, cur_value from sequence_tbl where tbl_name = ? for update"; // 添加行级锁
+			String updSql = "update sequence_tbl set min_value = ?"
+					+ ", max_value = ?"
+					+ ", cur_value = ? where tbl_name = ? and cur_value = ?"; 
+			PreparedStatement ps = conn.prepareStatement(selSql);
 			ps.setString(1, nickName);
-			ps.addBatch();
+			ps.addBatch(); 
 			ResultSet rs = ps.executeQuery();
-			if (rs.next()) {
-				
-			} else {
-				return null;
+			if (false == rs.next()) {
+				return 0;
 			}
+			int minV = rs.getInt(1);
+			int maxV = rs.getInt(2);
+			int curV = rs.getInt(3);
+			result = curV;
+			
+			curV += 1;
+			if (curV > maxV) {
+				curV = minV;
+			}
+			PreparedStatement ps2 = conn.prepareStatement(updSql);
+			ps2.setInt(1, minV);
+			ps2.setInt(2, maxV);
+			ps2.setInt(3, curV);
+			ps2.setString(4, nickName);
+			ps2.setInt(5, result);
+			int upds = ps2.executeUpdate();
+			if (upds == 0) {
+				throw new UtilsException("更新sequence表记录失败！！");
+			}
+			rs.close();
+			ps2.close();
+			return result;
 		} catch (SQLException e) {
 			e.printStackTrace();
-		} finally {
-			try {
-				conn.close();
-			} catch (SQLException e) {
-				logger.severe("关闭数据库连接失败！！");
-				e.printStackTrace();
-			}
-		}
-		return null;
-	}
-	private int getAndUpdCurValue(String nickName) {
-		try {
-			String sql = "select cur_value from sequence_tbl where tbl_name = ? for update";
-			PreparedStatement ps = conn.prepareStatement(sql);
-			ps.setString(1, nickName);
-			ps.addBatch();
-			ResultSet rs = ps.executeQuery();
-			if (rs.next()) {
-				
-			} else {
-				return -1;
-			}
-		} catch (SQLException e) {
-			e.printStackTrace();
-		} finally {
-			try {
-				conn.close();
-			} catch (SQLException e) {
-				logger.severe("关闭数据库连接失败！！");
-				e.printStackTrace();
-			}
-		}
-		return -1;
+		} 
+		return 0;
 	}
 }

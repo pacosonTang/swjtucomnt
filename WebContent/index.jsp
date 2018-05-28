@@ -13,7 +13,7 @@
 		标题：<input type="text" name="title" value="唐荣真棒"/><br>
 		内容：
 		<textarea name="content" rows="10" cols="10">
-			你真是个大骗子啊。大骗子啊，大骗子！！
+			西南交通刚大学
 		</textarea>
 		<input type="submit" name="submit" value="提交"/>
 	</form>
